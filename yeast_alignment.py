@@ -13,6 +13,12 @@ sorted_bam = os.path.join(output_dir, "sorted_reads.bam")
 vcf = os.path.join(output_dir, "variants.vcf.gz")
 output_sam = os.path.join(output_dir, "aligned_reads.sam")
 
+# Index the reference genome
+def index_reference(reference):
+  print("Indexing reference genome...")
+  index_command = f"bwa index {reference}"
+  subprocess.run(index_command, shell=True, check=True)
+  
 # Align sequence with BWA
 def align_sequence(reference, fasta, output_sam):               # defining function
   print ("Aligning sequences...")                               # print status message
