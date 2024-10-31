@@ -20,15 +20,15 @@ def align_sequence(reference, fasta, output_sam):               # defining funct
   subprocess.run(bwa_command, shell=True, check=True)           # run command
 
 # Convert SAM to BAM and sort
-def convert_sort_bam(sam_file, sorted_bam):
-  print ("Converting SAM to BAM and sorting...")
+def convert_sort_bam(sam_file, aligned_bam, sorted_bam):
+    print("Converting SAM to BAM and sorting...")
   
-  bam_command = f"samtools view -S -b {sam_file} > {aligned_bam}"
-  subprocess.run(bam_command, shell=True, check=True)
+    bam_command = f"samtools view -S -b {sam_file} > {aligned_bam}"
+    subprocess.run(bam_command, shell=True, check=True)
 
-  # Sort BAM file
-  sort_command = f"samtools sort {aligned_bam} -o {sorted_bam}"
-  subprocess.run(sort_command, shell=True, check=True)
+    # Sort BAM file
+    sort_command = f"samtools sort {aligned_bam} -o {sorted_bam}"
+    subprocess.run(sort_command, shell=True, check=True)
   
 # Index BAM file
 def index_bam(bam_file):
@@ -51,7 +51,8 @@ if __name__== "__main__":
   align_sequence(reference, fasta, output_sam)
 
   # Convert SAM to BAM and sort
-  convert_sort_bam(output_sam, sorted_bam)
+  convert_sort_bam(output_sam, aligned_bam, sorted_bam)
+
   
   # Index BAM file
   index_bam(sorted_bam)
