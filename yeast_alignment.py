@@ -50,8 +50,6 @@ def call_variants(reference, sorted_bam, vcf):
 
 # Main workflow
 if __name__== "__main__":
-  reference = "/mnt/c/Projects/PCA/data/reference.fa"
-  fasta = "/mnt/c/Projects/PCA/data/scerevisiae8.fa.gz/scerevisiae8.fa"
 
   # Align sequences
   align_sequence(reference, fasta, output_sam)
