@@ -6,7 +6,7 @@ output_dir = "/mnt/c/Projects/PCA/output"
 os.makedirs(output_dir, exist_ok=True)
 
 # Set file paths
-reference = "/home/kjohnwill/yeast_PCA/reference.fa.gz"
+reference = "/home/kjohnwill/yeast_PCA/reference.fa"
 fasta = "/home/kjohnwill/yeast_PCA/scerevisiae8.fa.gz"
 aligned_bam = os.path.join(output_dir, "aligned_reads.bam")
 sorted_bam = os.path.join(output_dir, "sorted_reads.bam")
