@@ -10,7 +10,7 @@ output_dir = "/mnt/c/Projects/PCA/output/"
 os.makedirs(output_dir, exist_ok=True)
 
 # Set file paths
-vcf = "/mnt/c/Projects/PCA/output/variants.vcf.gz"
+vcf = "/home/kjohnwill/yeast_PCA/output_variants.vcf"
 
 # Windowed PCA function and load VCF file
 def windowed_PCA(vcf, window_size=1000000, window_step=10000, min_variants=10):
