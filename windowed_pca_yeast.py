@@ -63,17 +63,17 @@ return np.array(window_midpoints), np.array(pc1_values), np.array(chromosomes)
 def plot_windowed_pca(window_midpoints, pc1_values, chromosomes):
     print("Plotting PC1 values across genome...")
 
-  # Plot PC1 values for each chromosome
-  unique_chromosomes = np.unique(chromosomes)
-  for chrom in unique_chromosomes:
-    mask = chromosomes == chrom
-    plt.plot(window_midpoints[mask], pc1_values[mask], label=f'Chr {chrom}', marker='o', markersize=3)
-    plt.xlabel('Genomic position (Mb)')
-    plt.ylabel('PC1')
-    plt.title('Windowed PCA: PC1 across genomic position')
-    plt.legend(loc='best')
-    plt.grid(True)
-    plt.show()
+# Plot PC1 values for each chromosome
+unique_chromosomes = np.unique(chromosomes)
+for chrom in unique_chromosomes:
+  mask = chromosomes == chrom
+  plt.plot(window_midpoints[mask], pc1_values[mask], label=f'Chr {chrom}', marker='o', markersize=3)
+  plt.xlabel('Genomic position (Mb)')
+  plt.ylabel('PC1')
+  plt.title('Windowed PCA: PC1 across genomic position')
+  plt.legend(loc='best')
+  plt.grid(True)
+  plt.show()
 
 # Main workflow
 if __name__ == "__main__":
