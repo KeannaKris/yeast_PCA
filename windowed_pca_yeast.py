@@ -32,9 +32,9 @@ def windowed_PCA(vcf, window_size=1000000, window_step=10000, min_variants=10):
     window_midpoints = []
     chromosomes = []
 
-    # Perform windowed PCA 
+    # Perform windowed PCA
     print("Performing windowed PCA...")
-    for start in range(0, np.max(pos), window_step):  # Use max(pos) for safety
+    for start in range(0, np.max(pos), window_step):
         end = start + window_size
 
         # Get indices of variants within window
@@ -42,15 +42,26 @@ def windowed_PCA(vcf, window_size=1000000, window_step=10000, min_variants=10):
         if np.sum(mask) >= min_variants:
             windowed_genotypes = genotype_matrix[:, mask]
 
-            # Perform PCA in window
-            coords, model = allel.pca(windowed_genotypes, n_components=1)
+            # Normalize data and check for invalid values
+            try:
+                from sklearn.preprocessing import StandardScaler
+                scaler = StandardScaler()
+                windowed_genotypes = scaler.fit_transform(windowed_genotypes)
+            except ValueError as e:
+                print(f"Error in window {start}-{end}: {e}")
+                continue
 
-            # Store PC1 and midpoint for window
-            pc1_values.extend(coords[:, 0])
-            window_mid = (start + end) // 2
-            window_midpoints.extend([window_mid] * len(coords[:, 0]))
-            chromosomes.extend([chrom[mask][0]] * len(coords[:, 0]) if np.any(mask) else ['NA'])
+            # Perform PCA if no NaN or inf values exist
+            if not np.any(np.isnan(windowed_genotypes)) and not np.any(np.isinf(windowed_genotypes)):
+                coords, model = allel.pca(windowed_genotypes, n_components=1)
+                pc1_values.extend(coords[:, 0])
+                window_mid = (start + end) // 2
+                window_midpoints.extend([window_mid] * len(coords[:, 0]))
+                chromosomes.extend([chrom[mask][0]] * len(coords[:, 0]))
+            else:
+                print(f"Skipping window {start}-{end} due to NaN or inf values.")
         else:
+            print(f"Skipping window {start}-{end}: Insufficient variants.")
             pc1_values.extend([np.nan] * np.sum(mask))
             window_mid = (start + end) // 2
             window_midpoints.extend([window_mid] * np.sum(mask))
