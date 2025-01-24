@@ -12,6 +12,8 @@ os.makedirs(output_dir, exist_ok=True)
 # Set file paths
 vcf = "/home/kjohnwill/yeast_PCA/variants02.vcf"
 
+print(f"Window size: {windowed_genotypes.shape}, NaN: {np.isnan(windowed_genotypes).sum()}, Inf: {np.isinf(windowed_genotypes).sum()}")
+
 # Windowed PCA function and load VCF file
 def windowed_PCA(vcf, window_size=1000000, window_step=10000, min_variants=10):
     # Load VCF file
