@@ -13,63 +13,70 @@ os.makedirs(output_dir, exist_ok=True)
 # Set file paths
 vcf = "/home/kjohnwill/yeast_PCA/output02.vcf"
 
-def extract_sample_info(format_str):
-    """Extract sample name from the complex format string"""
-    # Example format: 1|1:DBVPG6044#1#chrI@15833@15834@P
+def read_vcf(vcf_path):
+    """Read VCF file using pandas"""
+    # Read VCF file, skipping header lines that start with ##
+    vcf_df = pd.read_csv(vcf_path, sep='\t', comment='#', header=None)
+    # Read the header line separately to get column names
+    with open(vcf_path) as f:
+        header = []
+        for line in f:
+            if line.startswith('#') and not line.startswith('##'):
+                header = line.strip('#').strip().split('\t')
+                break
+    vcf_df.columns = header
+    return vcf_df
+
+def extract_sample_info(sample_str):
+    """Extract sample name from the sample column"""
+    # Example: 1|1:DBVPG6044#1#chrI@15833@15834@P
     try:
-        # Split on ':' and get the second part
-        sample_part = format_str.split(':')[1]
-        # Get the sample name (everything before the first '#')
+        sample_part = sample_str.split(':')[1]
         sample_name = sample_part.split('#')[0]
         return sample_name
     except:
         return None
 
-def process_variants_by_position(callset, mask):
+def process_variants_by_position(df, chromosome):
     """Process variants grouping by position and sample"""
-    pos = callset['variants/POS'][mask]
-    format_strings = callset['FORMAT'][mask]
+    # Filter for chromosome
+    chrom_df = df[df['#CHROM'] == chromosome].copy()
     
-    # Create a dictionary to store variants by position
-    pos_dict = defaultdict(lambda: np.zeros(7))
-    sample_to_idx = {name: idx for idx, name in enumerate([
-        'DBVPG6044', 'DBVPG6765', 'S288C', 'SK1', 
-        'UWOPS034614', 'Y12', 'YPS128'
-    ])}
+    # Define sample names and create mapping
+    sample_names = ['DBVPG6044', 'DBVPG6765', 'S288C', 'SK1', 
+                   'UWOPS034614', 'Y12', 'YPS128']
+    sample_to_idx = {name: idx for idx, name in enumerate(sample_names)}
+    
+    # Group by position
+    pos_dict = defaultdict(lambda: np.zeros(len(sample_names)))
     
     # Process each variant
-    for i, (p, fmt) in enumerate(zip(pos, format_strings)):
-        sample_name = extract_sample_info(fmt)
+    for _, row in chrom_df.iterrows():
+        pos = row['POS']
+        sample_name = extract_sample_info(row['sample'])
         if sample_name in sample_to_idx:
-            pos_dict[p][sample_to_idx[sample_name]] = 1
+            pos_dict[pos][sample_to_idx[sample_name]] = 1
     
     # Convert to matrix
     unique_pos = sorted(pos_dict.keys())
     genotype_matrix = np.array([pos_dict[p] for p in unique_pos])
     
+    print(f"Chromosome {chromosome}:")
     print(f"Generated matrix shape: {genotype_matrix.shape}")
     if len(genotype_matrix) > 0:
         print(f"Sample of first few variants:\n{genotype_matrix[:5]}")
     
     return genotype_matrix, unique_pos
 
-def windowed_PCA(vcf, window_size=10000, window_step=2000, min_variants=2):
-    # Load VCF file
+def windowed_PCA(vcf_path, window_size=10000, window_step=2000, min_variants=2):
+    # Read VCF file
     print("Loading VCF file...")
-    callset = allel.read_vcf(vcf, fields=['variants/CHROM', 'variants/POS',
-                                         'variants/FORMAT'])
-    
-    if callset is None:
-        print("Error: Could not load VCF file")
-        return None
-        
-    # Extract basic data
-    chrom = np.array(callset['variants/CHROM'])
-    pos = np.array(callset['variants/POS'])
+    vcf_df = read_vcf(vcf_path)
     
     # Print diagnostic information
     print(f"\nData Summary:")
-    print(f"Total variants: {len(pos)}")
+    print(f"Total variants: {len(vcf_df)}")
+    print(f"Chromosomes: {vcf_df['#CHROM'].unique()}")
     
     # Initialize results
     pc1_values = []
@@ -77,22 +84,19 @@ def windowed_PCA(vcf, window_size=10000, window_step=2000, min_variants=2):
     chromosomes = []
     
     # Process each chromosome separately
-    for current_chrom in np.unique(chrom):
+    for current_chrom in vcf_df['#CHROM'].unique():
         print(f"\nProcessing chromosome {current_chrom}")
         
-        # Get variants for this chromosome
-        chrom_mask = chrom == current_chrom
-        
         # Process variants for this chromosome
-        genotype_matrix, unique_pos = process_variants_by_position(callset, chrom_mask)
+        genotype_matrix, unique_pos = process_variants_by_position(vcf_df, current_chrom)
         
         if len(unique_pos) == 0:
             continue
-            
+        
         # Process windows
         for start in range(min(unique_pos), max(unique_pos), window_step):
             end = start + window_size
-            window_mask = (unique_pos >= start) & (unique_pos < end)
+            window_mask = (np.array(unique_pos) >= start) & (np.array(unique_pos) < end)
             
             if np.sum(window_mask) >= min_variants:
                 windowed_genotypes = genotype_matrix[window_mask]
