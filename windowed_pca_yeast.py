@@ -28,6 +28,7 @@ def windowed_PCA(vcf, window_size=10000, window_step=2000, min_variants=2):
     
     # Convert genotypes to allele counts matrix
     genotypes = allel.GenotypeArray(callset['calldata/GT'])
+    # Sum the allele counts across both haplotypes
     allele_counts = genotypes.to_n_alt()
     
     # Print diagnostic information
@@ -62,26 +63,39 @@ def windowed_PCA(vcf, window_size=10000, window_step=2000, min_variants=2):
             if np.sum(window_mask) >= min_variants:
                 windowed_genotypes = chrom_genotypes[window_mask]
                 
-                # Skip windows with no variation
+                # Check for sufficient variation
                 if np.all(windowed_genotypes == windowed_genotypes[0]):
                     continue
+                    
+                # Replace any missing values with 0
+                windowed_genotypes = np.nan_to_num(windowed_genotypes, nan=0)
                 
                 try:
-                    # Normalize the data
-                    geno_mean = np.nanmean(windowed_genotypes, axis=0)
-                    geno_std = np.nanstd(windowed_genotypes, axis=0)
-                    geno_std[geno_std == 0] = 1
+                    # Calculate variance for each sample
+                    sample_variances = np.var(windowed_genotypes, axis=0)
+                    
+                    # Skip if no variation
+                    if np.all(sample_variances == 0):
+                        continue
+                    
+                    # Normalize only if there's variation
+                    geno_mean = np.mean(windowed_genotypes, axis=0)
+                    geno_std = np.std(windowed_genotypes, axis=0)
+                    geno_std[geno_std == 0] = 1  # Avoid division by zero
+                    
                     normalized_genotypes = (windowed_genotypes - geno_mean) / geno_std
-                    normalized_genotypes = np.nan_to_num(normalized_genotypes)
                     
-                    # Perform PCA
-                    coords, model = allel.pca(normalized_genotypes, n_components=1)
-                    pc1_values.append(coords[0, 0])
-                    window_midpoints.append(start + window_size//2)
-                    chromosomes.append(current_chrom)
-                    
+                    # Verify no NaN or inf values
+                    if not np.any(np.isnan(normalized_genotypes)) and not np.any(np.isinf(normalized_genotypes)):
+                        # Perform PCA
+                        coords, model = allel.pca(normalized_genotypes, n_components=1)
+                        pc1_values.append(coords[0, 0])
+                        window_midpoints.append(start + window_size//2)
+                        chromosomes.append(current_chrom)
+                        print(f"Successfully processed window {start}-{end}")
+                        
                 except Exception as e:
-                    print(f"Error processing window {start}-{end}: {str(e)}")
+                    print(f"Skipping window {start}-{end}: {str(e)}")
                     continue
     
     return np.array(window_midpoints), np.array(pc1_values), np.array(chromosomes)
@@ -123,9 +137,9 @@ if __name__ == "__main__":
     try:
         window_midpoints, pc1_values, chromosomes = windowed_PCA(
             vcf, 
-            window_size=10000,    # 10kb windows
-            window_step=2000,     # 2kb steps
-            min_variants=2        # Minimum 2 variants per window
+            window_size=50000,    # Increased window size
+            window_step=10000,    # Increased step size
+            min_variants=5        # Increased minimum variants
         )
         
         if window_midpoints is not None and len(pc1_values) > 0:
