@@ -98,7 +98,7 @@ def windowed_PCA(vcf, window_size=50000, window_step=10000, min_variants=5):
     }
 
 def plot_windowed_pca(results, output_dir):
-    """Create PCA plot with samples as traces, using exact chromosome format"""
+    """Create PCA plot with chromosomes on x-axis"""
     if not results or len(results['pc1']) == 0:
         print("No results to plot")
         return
@@ -112,7 +112,6 @@ def plot_windowed_pca(results, output_dir):
     
     # Define chromosome order based on the Roman numeral part
     def get_chrom_number(chrom_name):
-        # Extract "chrI", "chrII", etc. from "SGDref#1#chrI"
         chr_part = chrom_name.split('#')[-1]
         roman_order = {'chrI': 1, 'chrII': 2, 'chrIII': 3, 'chrIV': 4, 'chrV': 5, 
                       'chrVI': 6, 'chrVII': 7, 'chrVIII': 8, 'chrIX': 9, 'chrX': 10, 
@@ -123,38 +122,45 @@ def plot_windowed_pca(results, output_dir):
     # Get unique chromosomes and sort them
     unique_chroms = sorted(set(results['chromosomes']), key=get_chrom_number)
     
+    # Create mapping for chromosome positions
+    chrom_positions = {chrom: idx+1 for idx, chrom in enumerate(unique_chroms)}
+    
     # Plot each sample
     for i in range(n_samples):
-        for chrom in unique_chroms:
-            pc1_values = []
-            positions = []
-            
-            # Collect data for this sample and chromosome
-            for j, pc1_window in enumerate(results['pc1']):
-                if pc1_window is not None and results['chromosomes'][j] == chrom:
-                    pc1_values.append(pc1_window[i])
-                    positions.append(results['positions'][j] / 1000000)  # Convert to Mb
-            
-            if pc1_values:
-                # Add trace for this sample and chromosome
-                fig.add_trace(go.Scatter(
-                    y=pc1_values,
-                    x=positions,
-                    mode='lines',
-                    name=sample_names[i] if chrom == unique_chroms[0] else None,
-                    line=dict(color=colors[i], width=1),
-                    showlegend=(chrom == unique_chroms[0])
-                ))
+        pc1_values = []
+        x_positions = []
+        
+        # Collect all data for this sample
+        for j, pc1_window in enumerate(results['pc1']):
+            if pc1_window is not None:
+                pc1_values.append(pc1_window[i])
+                # Use chromosome number as x-position
+                x_positions.append(chrom_positions[results['chromosomes'][j]])
+        
+        # Add trace for this sample
+        fig.add_trace(go.Scatter(
+            x=x_positions,
+            y=pc1_values,
+            mode='lines',
+            name=sample_names[i],
+            line=dict(color=colors[i], width=1)
+        ))
     
     # Update layout
     fig.update_layout(
         title='Windowed PCA across chromosomes',
+        xaxis_title='Chromosome',
         yaxis_title='PC1',
-        xaxis_title='Position (Mb)',
         showlegend=True,
         template='plotly_white',
         height=800,
         width=1500,
+        xaxis=dict(
+            tickmode='array',
+            ticktext=[chrom.split('#')[-1] for chrom in unique_chroms],
+            tickvals=list(range(1, len(unique_chroms) + 1)),
+            tickangle=0
+        ),
         legend=dict(
             yanchor="top",
             y=0.99,
