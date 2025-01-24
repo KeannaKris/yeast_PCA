@@ -43,12 +43,34 @@ def process_genotypes(genotypes, variant_type=None):
         return genotypes.to_n_alt()
 
 def windowed_PCA(vcf, window_size=50000, window_step=5000, min_variants=3):
-    """Perform windowed PCA analysis on VCF data"""
     # Load VCF file with specific fields
     print("Loading VCF file...")
     callset = allel.read_vcf(vcf, fields=['variants/CHROM', 'variants/POS', 
                                          'variants/SVTYPE', 'calldata/GT',
-                                         'variants/ID'])
+                                         'variants/ID', 'variants/ALT', 'variants/REF'])
+    
+    # Debug print
+    print("\nFirst few variants:")
+    for i in range(5):
+        print(f"\nVariant {i+1}:")
+        print(f"CHROM: {callset['variants/CHROM'][i]}")
+        print(f"POS: {callset['variants/POS'][i]}")
+        print(f"GT: {callset['calldata/GT'][i]}")
+        print(f"SVTYPE: {callset.get('variants/SVTYPE', [None]*len(callset['variants/CHROM']))[i]}")
+        print(f"REF: {callset['variants/REF'][i]}")
+        print(f"ALT: {callset['variants/ALT'][i]}")
+
+    # Check if we have any data
+    if not callset or 'calldata/GT' not in callset:
+        print("No genotype data found in VCF")
+        return None
+        
+    # Print raw genotype shape
+    print(f"\nRaw genotype shape: {callset['calldata/GT'].shape}")
+    
+    # Print first few genotypes
+    print("\nFirst few genotypes:")
+    print(callset['calldata/GT'][:5])
     
     if callset is None:
         raise ValueError("Failed to load VCF file")
