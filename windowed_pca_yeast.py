@@ -13,188 +13,177 @@ os.makedirs(output_dir, exist_ok=True)
 # Set file paths
 vcf = "/home/kjohnwill/yeast_PCA/output02.vcf"
 
-def read_vcf(vcf_path):
-    """Read VCF file while preserving header information"""
-    # Store header lines
-    header_lines = []
-    data_lines = []
+def parse_vcf_line(line):
+    """Parse a single VCF data line"""
+    if line.startswith('#'):
+        return None
+    parts = line.strip().split('\t')
+    if len(parts) < 10:  # Need at least 10 columns
+        return None
     
-    with open(vcf_path, 'r') as file:
-        for line in file:
-            if line.startswith('##'):
-                header_lines.append(line.strip())
-            else:
-                data_lines.append(line.strip())
-    
-    # Get column names from the #CHROM line
-    columns = data_lines[0].strip('#').split('\t')
-    
-    # Create DataFrame from remaining lines
-    data = [line.split('\t') for line in data_lines[1:]]
-    df = pd.DataFrame(data, columns=columns)
-    
-    # Convert POS to integer
-    df['POS'] = pd.to_numeric(df['POS'])
-    
-    return df, header_lines
+    return {
+        'chrom': parts[0],
+        'pos': int(parts[1]),
+        'ref': parts[3],
+        'alt': parts[4],
+        'info': parts[7],
+        'format': parts[8],
+        'sample': parts[9]
+    }
 
-def extract_sample_info(sample_str):
+def read_vcf(vcf_path):
+    """Read VCF file line by line"""
+    variants = []
+    with open(vcf_path, 'r') as f:
+        for line in f:
+            if line.startswith('#'):
+                continue
+            variant = parse_vcf_line(line)
+            if variant:
+                variants.append(variant)
+    return variants
+
+def extract_sample_name(sample_field):
     """Extract sample name from the sample field"""
     try:
-        if '|' not in sample_str:
-            return None
-            
-        parts = sample_str.split(':')
-        if len(parts) < 2:
-            return None
-            
-        sample_part = parts[1]
-        sample_name = sample_part.split('#')[0]
-        return sample_name
+        # Format is like "1|1:DBVPG6044#1#chrI@15833@15834@P"
+        genotype, info = sample_field.split(':')
+        sample_name = info.split('#')[0]
+        return sample_name if genotype == "1|1" else None
     except:
         return None
 
-def process_variants_by_position(df, chromosome):
-    """Process variants grouping by position and sample"""
-    # Filter for chromosome
-    chrom_df = df[df['#CHROM'] == chromosome].copy()
+def process_chromosome(variants, chrom):
+    """Process variants for a single chromosome"""
+    # Filter variants for this chromosome
+    chrom_variants = [v for v in variants if v['chrom'] == chrom]
     
-    # Define sample names and create mapping
-    sample_names = ['DBVPG6044', 'DBVPG6765', 'S288C', 'SK1', 
-                   'UWOPS034614', 'Y12', 'YPS128']
-    sample_to_idx = {name: idx for idx, name in enumerate(sample_names)}
+    # Define our samples
+    samples = ['DBVPG6044', 'DBVPG6765', 'S288C', 'SK1', 
+              'UWOPS034614', 'Y12', 'YPS128']
+    sample_dict = {s: i for i, s in enumerate(samples)}
     
-    # Group by position
-    pos_dict = defaultdict(lambda: np.zeros(len(sample_names)))
-    variant_count = 0
+    # Create position-based variant matrix
+    pos_dict = defaultdict(lambda: np.zeros(len(samples)))
     
     # Process each variant
-    for _, row in chrom_df.iterrows():
-        pos = row['POS']
-        sample_info = row['sample']
-        
-        if '1|1' in sample_info:  # Check if variant is present
-            sample_name = extract_sample_info(sample_info)
-            if sample_name in sample_to_idx:
-                pos_dict[pos][sample_to_idx[sample_name]] = 1
-                variant_count += 1
+    for variant in chrom_variants:
+        pos = variant['pos']
+        sample_name = extract_sample_name(variant['sample'])
+        if sample_name in sample_dict:
+            pos_dict[pos][sample_dict[sample_name]] = 1
     
     # Convert to matrix
-    unique_pos = sorted(pos_dict.keys())
-    genotype_matrix = np.array([pos_dict[p] for p in unique_pos])
-    
-    print(f"\nChromosome {chromosome}:")
-    print(f"Total variants processed: {variant_count}")
-    print(f"Unique positions: {len(unique_pos)}")
-    print(f"Matrix shape: {genotype_matrix.shape}")
-    
-    return genotype_matrix, unique_pos
+    positions = sorted(pos_dict.keys())
+    if not positions:
+        return None, None
+        
+    matrix = np.array([pos_dict[p] for p in positions])
+    return matrix, positions
 
-def windowed_PCA(vcf_path, window_size=10000, window_step=2000, min_variants=2):
-    """Perform windowed PCA analysis on VCF data"""
-    # Read VCF file
-    print("Loading VCF file...")
-    vcf_df, header_lines = read_vcf(vcf_path)
+def windowed_pca(vcf_path, window_size=10000, window_step=2000, min_variants=2):
+    """Perform windowed PCA analysis"""
+    print("Reading VCF file...")
+    variants = read_vcf(vcf_path)
+    print(f"Total variants read: {len(variants)}")
     
-    print(f"\nData Summary:")
-    print(f"Total variants: {len(vcf_df)}")
-    print(f"Chromosomes: {vcf_df['#CHROM'].unique()}")
+    # Get unique chromosomes
+    chroms = sorted(set(v['chrom'] for v in variants))
+    print(f"Found chromosomes: {chroms}")
     
-    # Initialize results
-    pc1_values = []
-    window_midpoints = []
-    chromosomes = []
+    # Results storage
+    all_pc1 = []
+    all_positions = []
+    all_chroms = []
     
     # Process each chromosome
-    for current_chrom in sorted(vcf_df['#CHROM'].unique()):
-        print(f"\nProcessing {current_chrom}")
+    for chrom in chroms:
+        print(f"\nProcessing {chrom}")
         
         # Get variant matrix for this chromosome
-        genotype_matrix, unique_pos = process_variants_by_position(vcf_df, current_chrom)
-        
-        if len(unique_pos) == 0:
+        geno_matrix, positions = process_chromosome(variants, chrom)
+        if geno_matrix is None:
             continue
+            
+        print(f"Generated matrix of shape {geno_matrix.shape}")
         
         # Process windows
-        for start in range(min(unique_pos), max(unique_pos), window_step):
+        for start in range(min(positions), max(positions), window_step):
             end = start + window_size
-            window_mask = (np.array(unique_pos) >= start) & (np.array(unique_pos) < end)
+            window_mask = (np.array(positions) >= start) & (np.array(positions) < end)
             
-            if np.sum(window_mask) >= min_variants:
-                windowed_genotypes = genotype_matrix[window_mask]
+            if sum(window_mask) >= min_variants:
+                window_geno = geno_matrix[window_mask]
                 
-                # Skip windows with no variation
-                if np.all(windowed_genotypes == windowed_genotypes[0]):
+                # Skip if no variation
+                if np.all(window_geno == window_geno[0]):
                     continue
-                
-                try:
-                    # Normalize the data
-                    geno_mean = np.nanmean(windowed_genotypes, axis=0)
-                    geno_std = np.nanstd(windowed_genotypes, axis=0)
-                    geno_std[geno_std == 0] = 1
-                    normalized_genotypes = (windowed_genotypes - geno_mean) / geno_std
-                    normalized_genotypes = np.nan_to_num(normalized_genotypes)
                     
-                    # Perform PCA
-                    coords, model = allel.pca(normalized_genotypes, n_components=1)
-                    pc1_values.append(coords[0, 0])
-                    window_midpoints.append(start + window_size//2)
-                    chromosomes.append(current_chrom)
+                try:
+                    # Normalize
+                    geno_mean = np.mean(window_geno, axis=0)
+                    geno_std = np.std(window_geno, axis=0)
+                    geno_std[geno_std == 0] = 1
+                    norm_geno = (window_geno - geno_mean) / geno_std
+                    
+                    # PCA
+                    coords, model = allel.pca(norm_geno, n_components=1)
+                    
+                    # Store results
+                    all_pc1.append(coords[0, 0])
+                    all_positions.append((start + end) // 2)
+                    all_chroms.append(chrom)
                     
                 except Exception as e:
                     print(f"Error in window {start}-{end}: {str(e)}")
                     continue
     
-    return np.array(window_midpoints), np.array(pc1_values), np.array(chromosomes)
+    return np.array(all_positions), np.array(all_pc1), np.array(all_chroms)
 
-def plot_windowed_pca(window_midpoints, pc1_values, chromosomes):
+def plot_results(positions, pc1_values, chroms):
     """Plot PCA results"""
     if len(pc1_values) == 0:
-        print("No data to plot")
+        print("No results to plot")
         return
-    
-    print("Plotting PC1 values across genome...")
+        
     plt.figure(figsize=(15, 8))
     
-    # Plot for each chromosome
-    unique_chromosomes = np.unique(chromosomes)
-    colors = plt.cm.tab10(np.linspace(0, 1, len(unique_chromosomes)))
+    # Plot each chromosome
+    unique_chroms = sorted(set(chroms))
+    colors = plt.cm.tab10(np.linspace(0, 1, len(unique_chroms)))
     
-    for i, chrom in enumerate(unique_chromosomes):
-        mask = chromosomes == chrom
-        if np.sum(mask) > 0:
-            chrom_label = chrom.split('#')[-1]
-            plt.scatter(window_midpoints[mask]/1000000, pc1_values[mask], 
-                       label=chrom_label, color=colors[i], alpha=0.6, s=20)
+    for i, chrom in enumerate(unique_chroms):
+        mask = chroms == chrom
+        if sum(mask) > 0:
+            label = chrom.split('#')[-1]  # Just show chrI instead of SGDref#1#chrI
+            plt.scatter(positions[mask]/1000000, pc1_values[mask],
+                       label=label, color=colors[i], alpha=0.6, s=20)
     
-    plt.xlabel('Genomic position (Mb)')
+    plt.xlabel('Genomic Position (Mb)')
     plt.ylabel('PC1')
-    plt.title('Windowed PCA: PC1 across genomic position')
+    plt.title('Windowed PCA across Genome')
     plt.legend(bbox_to_anchor=(1.05, 1), loc='upper left')
     plt.grid(True, alpha=0.3)
     
-    # Save plot
     plt.tight_layout()
-    plt.savefig(os.path.join(output_dir, 'windowed_pca_plot.png'), 
+    plt.savefig(os.path.join(output_dir, 'pca_results.png'),
                 bbox_inches='tight', dpi=300)
     plt.close()
 
-# Main workflow
 if __name__ == "__main__":
-    print("\nStarting PCA analysis...")
+    print("Starting analysis...")
     try:
-        window_midpoints, pc1_values, chromosomes = windowed_PCA(
-            vcf, 
-            window_size=10000,    # 10kb windows
-            window_step=2000,     # 2kb steps
-            min_variants=2        # Minimum 2 variants per window
+        positions, pc1_values, chroms = windowed_pca(
+            vcf,
+            window_size=10000,
+            window_step=2000,
+            min_variants=2
         )
         
-        if window_midpoints is not None and len(pc1_values) > 0:
-            plot_windowed_pca(window_midpoints, pc1_values, chromosomes)
-            print("\nAnalysis complete! Check the output directory for the plot.")
+        if len(pc1_values) > 0:
+            plot_results(positions, pc1_values, chroms)
+            print("Analysis complete! Check output directory for plot.")
         else:
-            print("\nNo PCA results were generated. Try adjusting parameters.")
-            
+            print("No PCA results generated. Try adjusting parameters.")
     except Exception as e:
-        print(f"Error during analysis: {str(e)}")
+        print(f"Error during analysis: {e}")
