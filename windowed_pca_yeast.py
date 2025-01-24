@@ -6,11 +6,11 @@ import allel
 import matplotlib.pyplot as plt
 
 # Set output directory
-output_dir = "//home/kjohnwill/yeast_PCA"
+output_dir = "/home/kjohnwill/yeast_PCA"
 os.makedirs(output_dir, exist_ok=True)
 
 # Set file paths
-vcf = "/home/kjohnwill/yeast_PCA/variants.vcf"
+vcf = "/home/kjohnwill/yeast_PCA/variants02.vcf"
 
 # Windowed PCA function and load VCF file
 def windowed_PCA(vcf, window_size=1000000, window_step=10000, min_variants=10):
@@ -34,7 +34,7 @@ def windowed_PCA(vcf, window_size=1000000, window_step=10000, min_variants=10):
 
     # Perform windowed PCA 
     print("Performing windowed PCA...")
-    for start in range(0, pos[-1], window_step):
+    for start in range(0, np.max(pos), window_step):  # Use max(pos) for safety
         end = start + window_size
 
         # Get indices of variants within window
@@ -49,12 +49,12 @@ def windowed_PCA(vcf, window_size=1000000, window_step=10000, min_variants=10):
             pc1_values.extend(coords[:, 0])
             window_mid = (start + end) // 2
             window_midpoints.extend([window_mid] * len(coords[:, 0]))
-            chromosomes.extend([chrom[mask][0]] * len(coords[:, 0]))
+            chromosomes.extend([chrom[mask][0]] * len(coords[:, 0]) if np.any(mask) else ['NA'])
         else:
             pc1_values.extend([np.nan] * np.sum(mask))
             window_mid = (start + end) // 2
             window_midpoints.extend([window_mid] * np.sum(mask))
-            chromosomes.extend([chrom[mask][0]] * np.sum(mask))
+            chromosomes.extend(['NA'] * np.sum(mask))
 
     return np.array(window_midpoints), np.array(pc1_values), np.array(chromosomes)
 
@@ -65,6 +65,8 @@ def plot_windowed_pca(window_midpoints, pc1_values, chromosomes):
     # Plot PC1 values for each chromosome
     unique_chromosomes = np.unique(chromosomes)
     for chrom in unique_chromosomes:
+        if chrom == 'NA':
+            continue
         mask = chromosomes == chrom
         plt.plot(window_midpoints[mask], pc1_values[mask], label=f'Chr {chrom}', marker='o', markersize=3)
     plt.xlabel('Genomic position (Mb)')
