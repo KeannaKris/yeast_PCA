@@ -10,7 +10,7 @@ output_dir = "/home/kjohnwill/yeast_PCA"
 os.makedirs(output_dir, exist_ok=True)
 
 # Set file paths
-vcf = "/home/kjohnwill/yeast_PCA/output.vcf"
+vcf = "/home/kjohnwill/yeast_PCA/output02.vcf"
 
 # Windowed PCA function and load VCF file
 def windowed_PCA(vcf, window_size=1000000, window_step=10000, min_variants=10):
