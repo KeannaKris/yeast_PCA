@@ -13,24 +13,30 @@ os.makedirs(output_dir, exist_ok=True)
 vcf = "/home/kjohnwill/yeast_PCA/output02.vcf"
 
 def process_genotypes(callset, mask):
-    """Process genotypes and extract information from the complex format"""
-    # Get the FORMAT field which contains the variant information
-    genotypes = np.zeros((np.sum(mask), 7))  # Matrix for 7 samples
+    """Process genotypes comparing reference to samples"""
+    # Get the relevant variants
     gt_data = callset['calldata/GT'][mask]
+    n_variants = np.sum(mask)
     
-    # Convert presence of variant (1|1) to 1, absence to 0
-    genotypes = (gt_data[:, 0, 0] == 1).astype(int)
-    # Expand to 7 samples
-    genotypes = np.tile(genotypes.reshape(-1, 1), (1, 7))
+    # Create matrix: variants x 7 samples
+    genotype_matrix = np.zeros((n_variants, 7))
     
-    return genotypes
+    # If GT is 1|1, it means the sample has the ALT allele (different from reference)
+    genotype_matrix = (gt_data[:, 0, 0] == 1).astype(int)[:, np.newaxis]
+    # Repeat the column 7 times for each sample
+    genotype_matrix = np.repeat(genotype_matrix, 7, axis=1)
+    
+    print(f"Processed genotype matrix shape: {genotype_matrix.shape}")
+    print(f"Sample of genotype values:\n{genotype_matrix[:5, :]}")
+    
+    return genotype_matrix
 
-# Windowed PCA function and load VCF file
 def windowed_PCA(vcf, window_size=10000, window_step=2000, min_variants=2):
     # Load VCF file
     print("Loading VCF file...")
     callset = allel.read_vcf(vcf, fields=['variants/CHROM', 'variants/POS', 
-                                         'variants/SVTYPE', 'calldata/GT'])
+                                         'variants/REF', 'variants/ALT',
+                                         'calldata/GT'])
     
     if callset is None:
         print("Error: Could not load VCF file")
@@ -39,14 +45,14 @@ def windowed_PCA(vcf, window_size=10000, window_step=2000, min_variants=2):
     # Extract chromosome and position data
     chrom = np.array(callset['variants/CHROM'])
     pos = np.array(callset['variants/POS'])
-    svtype = np.array(callset.get('variants/SVTYPE', [None] * len(chrom)))
     
     # Print diagnostic information
-    print(f"\nTotal variants: {len(pos)}")
+    print(f"\nData Summary:")
+    print(f"Total variants: {len(pos)}")
     print(f"Genotype shape: {callset['calldata/GT'].shape}")
     print(f"Unique chromosomes: {np.unique(chrom)}")
     
-    # Initialize PC1 results list and window midpoints
+    # Initialize results
     pc1_values = []
     window_midpoints = []
     chromosomes = []
@@ -56,7 +62,7 @@ def windowed_PCA(vcf, window_size=10000, window_step=2000, min_variants=2):
     
     # Process each chromosome separately
     for current_chrom in np.unique(chrom):
-        print(f"Processing chromosome {current_chrom}")
+        print(f"\nProcessing chromosome {current_chrom}")
         
         # Get variants for this chromosome
         chrom_mask = chrom == current_chrom
@@ -79,6 +85,7 @@ def windowed_PCA(vcf, window_size=10000, window_step=2000, min_variants=2):
                 
                 # Skip windows with no variation
                 if np.all(windowed_genotypes == windowed_genotypes[0]):
+                    print(f"Skipping window {start}-{end}: No variation")
                     continue
                 
                 try:
@@ -92,15 +99,14 @@ def windowed_PCA(vcf, window_size=10000, window_step=2000, min_variants=2):
                     # Only perform PCA if we have variation
                     if np.any(normalized_genotypes != normalized_genotypes[0]):
                         coords, model = allel.pca(normalized_genotypes, n_components=1)
-                        pc1_values.extend(coords[:, 0])
-                        window_midpoints.extend([start + window_size//2] * len(coords[:, 0]))
-                        chromosomes.extend([current_chrom] * len(coords[:, 0]))
+                        pc1_values.extend([coords[0, 0]])  # Take first PC only
+                        window_midpoints.extend([start + window_size//2])
+                        chromosomes.extend([current_chrom])
+                        print(f"Successfully processed window {start}-{end}")
                         
                 except Exception as e:
                     print(f"Error processing window {start}-{end}: {str(e)}")
                     continue
-            else:
-                print(f"Skipping window {start}-{end}: Insufficient variants ({np.sum(window_mask)} found)")
     
     return np.array(window_midpoints), np.array(pc1_values), np.array(chromosomes)
 
@@ -119,7 +125,6 @@ def plot_windowed_pca(window_midpoints, pc1_values, chromosomes):
     for i, chrom in enumerate(unique_chromosomes):
         mask = chromosomes == chrom
         if np.sum(mask) > 0:
-            # Extract just the chromosome number for cleaner labels
             chrom_label = chrom.split('#')[-1]
             plt.scatter(window_midpoints[mask]/1000000, pc1_values[mask], 
                        label=chrom_label, color=colors[i], alpha=0.6, s=20)
@@ -147,7 +152,7 @@ if __name__ == "__main__":
             min_variants=2        # Minimum 2 variants per window
         )
         
-        if len(pc1_values) > 0:
+        if window_midpoints is not None and len(pc1_values) > 0:
             plot_windowed_pca(window_midpoints, pc1_values, chromosomes)
             print("\nAnalysis complete! Check the output directory for the plot.")
         else:
