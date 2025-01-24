@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 import allel
 import plotly.graph_objects as go
-from plotly.subplots import make_subplots
 
 # Set output directory
 output_dir = "/home/kjohnwill/yeast_PCA"
@@ -31,6 +30,132 @@ def process_window_pca(genotypes, scaler='patterson'):
     except Exception as e:
         print(f"Error in PCA: {str(e)}")
         return None, 0
+
+def plot_by_position(results, output_dir):
+    """Create PCA plot with genomic positions on x-axis"""
+    if not results or len(results['pc1']) == 0:
+        print("No results to plot")
+        return
+        
+    fig = go.Figure()
+    
+    # Get unique samples
+    n_samples = len(results['pc1'][0])
+    sample_names = ['DBVPG6044', 'DBVPG6765', 'S288C', 'SK1', 'UWOPS034614', 'Y12', 'YPS128']
+    colors = ['red', 'blue', 'green', 'purple', 'orange', 'brown', 'pink']
+    
+    # Plot each sample
+    for i in range(n_samples):
+        pc1_values = []
+        positions = []
+        
+        # Collect data for this sample
+        for j, pc1_window in enumerate(results['pc1']):
+            if pc1_window is not None:
+                pc1_values.append(pc1_window[i])
+                positions.append(results['positions'][j] / 1000000)  # Convert to Mb
+        
+        # Add trace for this sample
+        fig.add_trace(go.Scatter(
+            x=positions,
+            y=pc1_values,
+            mode='lines',
+            name=sample_names[i],
+            line=dict(color=colors[i], width=1)
+        ))
+    
+    # Update layout
+    fig.update_layout(
+        title='Windowed PCA by Position',
+        xaxis_title='Position (Mb)',
+        yaxis_title='PC1',
+        showlegend=True,
+        template='plotly_white',
+        height=800,
+        width=1500,
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="right",
+            x=0.99
+        )
+    )
+    
+    # Save plot
+    fig.write_html(os.path.join(output_dir, 'windowed_pca_by_position.html'))
+    fig.write_image(os.path.join(output_dir, 'windowed_pca_by_position.png'))
+
+def plot_by_chromosome(results, output_dir):
+    """Create PCA plot with chromosomes on x-axis"""
+    if not results or len(results['pc1']) == 0:
+        print("No results to plot")
+        return
+        
+    fig = go.Figure()
+    
+    # Get unique samples
+    n_samples = len(results['pc1'][0])
+    sample_names = ['DBVPG6044', 'DBVPG6765', 'S288C', 'SK1', 'UWOPS034614', 'Y12', 'YPS128']
+    colors = ['red', 'blue', 'green', 'purple', 'orange', 'brown', 'pink']
+    
+    # Get unique chromosomes and sort them
+    def get_chrom_number(chrom_name):
+        chr_part = chrom_name.split('#')[-1]
+        roman_order = {'chrI': 1, 'chrII': 2, 'chrIII': 3, 'chrIV': 4, 'chrV': 5, 
+                      'chrVI': 6, 'chrVII': 7, 'chrVIII': 8, 'chrIX': 9, 'chrX': 10, 
+                      'chrXI': 11, 'chrXII': 12, 'chrXIII': 13, 'chrXIV': 14, 
+                      'chrXV': 15, 'chrXVI': 16, 'chrMT': 17}
+        return roman_order.get(chr_part, 99)
+    
+    unique_chroms = sorted(set(results['chromosomes']), key=get_chrom_number)
+    chrom_positions = {chrom: idx+1 for idx, chrom in enumerate(unique_chroms)}
+    
+    # Plot each sample
+    for i in range(n_samples):
+        pc1_values = []
+        x_positions = []
+        
+        # Collect data for this sample
+        for j, pc1_window in enumerate(results['pc1']):
+            if pc1_window is not None:
+                pc1_values.append(pc1_window[i])
+                x_positions.append(chrom_positions[results['chromosomes'][j]])
+        
+        # Add trace for this sample
+        fig.add_trace(go.Scatter(
+            x=x_positions,
+            y=pc1_values,
+            mode='lines',
+            name=sample_names[i],
+            line=dict(color=colors[i], width=1)
+        ))
+    
+    # Update layout
+    fig.update_layout(
+        title='Windowed PCA by Chromosome',
+        xaxis_title='Chromosome',
+        yaxis_title='PC1',
+        showlegend=True,
+        template='plotly_white',
+        height=800,
+        width=1500,
+        xaxis=dict(
+            tickmode='array',
+            ticktext=[chrom.split('#')[-1] for chrom in unique_chroms],
+            tickvals=list(range(1, len(unique_chroms) + 1)),
+            tickangle=0
+        ),
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="right",
+            x=0.99
+        )
+    )
+    
+    # Save plot
+    fig.write_html(os.path.join(output_dir, 'windowed_pca_by_chromosome.html'))
+    fig.write_image(os.path.join(output_dir, 'windowed_pca_by_chromosome.png'))
 
 def windowed_PCA(vcf, window_size=50000, window_step=10000, min_variants=5):
     """Perform windowed PCA analysis"""
@@ -97,83 +222,6 @@ def windowed_PCA(vcf, window_size=50000, window_step=10000, min_variants=5):
         'n_variants': n_variants
     }
 
-def plot_windowed_pca(results, output_dir):
-    """Create PCA plot with chromosomes on x-axis"""
-    if not results or len(results['pc1']) == 0:
-        print("No results to plot")
-        return
-        
-    fig = go.Figure()
-    
-    # Get unique samples
-    n_samples = len(results['pc1'][0])
-    sample_names = ['DBVPG6044', 'DBVPG6765', 'S288C', 'SK1', 'UWOPS034614', 'Y12', 'YPS128']
-    colors = ['red', 'blue', 'green', 'purple', 'orange', 'brown', 'pink']
-    
-    # Define chromosome order based on the Roman numeral part
-    def get_chrom_number(chrom_name):
-        chr_part = chrom_name.split('#')[-1]
-        roman_order = {'chrI': 1, 'chrII': 2, 'chrIII': 3, 'chrIV': 4, 'chrV': 5, 
-                      'chrVI': 6, 'chrVII': 7, 'chrVIII': 8, 'chrIX': 9, 'chrX': 10, 
-                      'chrXI': 11, 'chrXII': 12, 'chrXIII': 13, 'chrXIV': 14, 
-                      'chrXV': 15, 'chrXVI': 16, 'chrMT': 17}
-        return roman_order.get(chr_part, 99)
-    
-    # Get unique chromosomes and sort them
-    unique_chroms = sorted(set(results['chromosomes']), key=get_chrom_number)
-    
-    # Create mapping for chromosome positions
-    chrom_positions = {chrom: idx+1 for idx, chrom in enumerate(unique_chroms)}
-    
-    # Plot each sample
-    for i in range(n_samples):
-        pc1_values = []
-        x_positions = []
-        
-        # Collect all data for this sample
-        for j, pc1_window in enumerate(results['pc1']):
-            if pc1_window is not None:
-                pc1_values.append(pc1_window[i])
-                # Use chromosome number as x-position
-                x_positions.append(chrom_positions[results['chromosomes'][j]])
-        
-        # Add trace for this sample
-        fig.add_trace(go.Scatter(
-            x=x_positions,
-            y=pc1_values,
-            mode='lines',
-            name=sample_names[i],
-            line=dict(color=colors[i], width=1)
-        ))
-    
-    # Update layout
-    fig.update_layout(
-        title='Windowed PCA across chromosomes',
-        xaxis_title='Chromosome',
-        yaxis_title='PC1',
-        showlegend=True,
-        template='plotly_white',
-        height=800,
-        width=1500,
-        xaxis=dict(
-            tickmode='array',
-            ticktext=[chrom.split('#')[-1] for chrom in unique_chroms],
-            tickvals=list(range(1, len(unique_chroms) + 1)),
-            tickangle=0
-        ),
-        legend=dict(
-            yanchor="top",
-            y=0.99,
-            xanchor="right",
-            x=0.99
-        )
-    )
-    
-    # Save plot
-    fig.write_html(os.path.join(output_dir, 'windowed_pca_plot.html'))
-    fig.write_image(os.path.join(output_dir, 'windowed_pca_plot.png'))
-    print(f"Plots saved to {output_dir}")
-
 # Main workflow
 if __name__ == "__main__":
     print("\nStarting PCA analysis...")
@@ -186,10 +234,13 @@ if __name__ == "__main__":
             min_variants=5        # Minimum 5 variants per window
         )
         
-        # Create plots
+        # Create both types of plots
         if results and len(results['pc1']) > 0:
-            plot_windowed_pca(results, output_dir)
-            print("\nAnalysis complete! Check output directory for plots.")
+            plot_by_position(results, output_dir)
+            plot_by_chromosome(results, output_dir)
+            print("\nAnalysis complete! Check output directory for plots:")
+            print("1. windowed_pca_by_position.png")
+            print("2. windowed_pca_by_chromosome.png")
         else:
             print("\nNo PCA results were generated. Try adjusting parameters.")
             
