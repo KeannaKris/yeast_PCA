@@ -45,21 +45,21 @@ def windowed_PCA(vcf, window_size=1000000, window_step=10000, min_variants=10):
             # Replace NaN or Inf values with zeros
             windowed_genotypes = np.nan_to_num(windowed_genotypes, nan=0.0, posinf=0.0, neginf=0.0)
 
-            # Normalize data (optional but recommended)
-            from sklearn.preprocessing import StandardScaler
-            scaler = StandardScaler()
-            if windowed_genotypes.shape[1] > 0:
-                windowed_genotypes = scaler.fit_transform(windowed_genotypes)
+            # Check for invalid values
+            if np.any(np.isnan(windowed_genotypes)) or np.any(np.isinf(windowed_genotypes)):
+                print(f"Skipping window {start}-{end} due to invalid data.")
+                continue
 
-            # Check if data is valid for PCA
-            if not np.any(np.isnan(windowed_genotypes)) and not np.any(np.isinf(windowed_genotypes)):
+            # Perform PCA
+            try:
                 coords, model = allel.pca(windowed_genotypes, n_components=1)
                 pc1_values.extend(coords[:, 0])
                 window_mid = (start + end) // 2
                 window_midpoints.extend([window_mid] * len(coords[:, 0]))
                 chromosomes.extend([chrom[mask][0]] * len(coords[:, 0]))
-            else:
-                print(f"Skipping window {start}-{end} due to NaN or inf values after cleaning.")
+            except ValueError as e:
+                print(f"Error performing PCA on window {start}-{end}: {e}")
+                continue
         else:
             print(f"Skipping window {start}-{end}: Insufficient variants.")
             pc1_values.extend([np.nan] * np.sum(mask))
