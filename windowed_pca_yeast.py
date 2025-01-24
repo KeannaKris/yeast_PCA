@@ -12,8 +12,6 @@ os.makedirs(output_dir, exist_ok=True)
 # Set file paths
 vcf = "/home/kjohnwill/yeast_PCA/variants02.vcf"
 
-print(f"Window size: {windowed_genotypes.shape}, NaN: {np.isnan(windowed_genotypes).sum()}, Inf: {np.isinf(windowed_genotypes).sum()}")
-
 # Windowed PCA function and load VCF file
 def windowed_PCA(vcf, window_size=1000000, window_step=10000, min_variants=10):
     # Load VCF file
@@ -44,16 +42,16 @@ def windowed_PCA(vcf, window_size=1000000, window_step=10000, min_variants=10):
         if np.sum(mask) >= min_variants:
             windowed_genotypes = genotype_matrix[:, mask]
 
-            # Normalize data and check for invalid values
-            try:
-                from sklearn.preprocessing import StandardScaler
-                scaler = StandardScaler()
-                windowed_genotypes = scaler.fit_transform(windowed_genotypes)
-            except ValueError as e:
-                print(f"Error in window {start}-{end}: {e}")
-                continue
+            # Replace NaN or Inf values with zeros
+            windowed_genotypes = np.nan_to_num(windowed_genotypes, nan=0.0, posinf=0.0, neginf=0.0)
 
-            # Perform PCA if no NaN or inf values exist
+            # Normalize data (optional but recommended)
+            from sklearn.preprocessing import StandardScaler
+            scaler = StandardScaler()
+            if windowed_genotypes.shape[1] > 0:
+                windowed_genotypes = scaler.fit_transform(windowed_genotypes)
+
+            # Check if data is valid for PCA
             if not np.any(np.isnan(windowed_genotypes)) and not np.any(np.isinf(windowed_genotypes)):
                 coords, model = allel.pca(windowed_genotypes, n_components=1)
                 pc1_values.extend(coords[:, 0])
@@ -61,7 +59,7 @@ def windowed_PCA(vcf, window_size=1000000, window_step=10000, min_variants=10):
                 window_midpoints.extend([window_mid] * len(coords[:, 0]))
                 chromosomes.extend([chrom[mask][0]] * len(coords[:, 0]))
             else:
-                print(f"Skipping window {start}-{end} due to NaN or inf values.")
+                print(f"Skipping window {start}-{end} due to NaN or inf values after cleaning.")
         else:
             print(f"Skipping window {start}-{end}: Insufficient variants.")
             pc1_values.extend([np.nan] * np.sum(mask))
