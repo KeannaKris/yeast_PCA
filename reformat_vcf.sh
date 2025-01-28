@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # Create new header
-cat > vcf_header.txt << EOL
+cat > vcf_header.txt << 'EOL'
 ##fileformat=VCFv4.2
 ##FILTER=<ID=PASS,Description="All filters passed">
 ##contig=<ID=SGDref#1#chrI,length=230218>
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
-#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tDBVPG6044\tDBVPG6765\tS288C\tSK1\tUWOPS034614\tY12\tYPS128
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	DBVPG6044	DBVPG6765	S288C	SK1	UWOPS034614	Y12	YPS128
 EOL
 
 # Process the VCF file
