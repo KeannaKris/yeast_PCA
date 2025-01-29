@@ -84,6 +84,110 @@ def plot_by_position(results, output_dir):
     fig.write_html(os.path.join(output_dir, 'windowed_pca_by_position.html'))
     fig.write_image(os.path.join(output_dir, 'windowed_pca_by_position.png'))
 
+def plot_combined_positions(results, output_dir):
+    """Create PCA plot showing both chromosome and base pair positions"""
+    if not results or len(results['pc1']) == 0:
+        print("No results to plot")
+        return
+        
+    fig = go.Figure()
+    
+    # Sample info
+    sample_names = ['DBVPG6044', 'DBVPG6765', 'S288C', 'SK1', 'UWOPS034614', 'Y12', 'YPS128']
+    colors = ['red', 'blue', 'green', 'purple', 'orange', 'brown', 'pink']
+    
+    # Create chromosome mapping
+    chrom_lengths = {
+        'SGDref#1#chrI': 230218,
+        'SGDref#1#chrII': 813184,
+        'SGDref#1#chrIII': 316620,
+        'SGDref#1#chrIV': 1531933,
+        'SGDref#1#chrV': 576874,
+        'SGDref#1#chrVI': 270161,
+        'SGDref#1#chrVII': 1090940,
+        'SGDref#1#chrVIII': 562643,
+        'SGDref#1#chrIX': 439888,
+        'SGDref#1#chrX': 745751,
+        'SGDref#1#chrXI': 666816,
+        'SGDref#1#chrXII': 1078177,
+        'SGDref#1#chrXIII': 924431,
+        'SGDref#1#chrXIV': 784333,
+        'SGDref#1#chrXV': 1091291,
+        'SGDref#1#chrXVI': 948066
+    }
+    
+    # Calculate cumulative positions
+    cumulative_length = 0
+    chrom_starts = {}
+    for chrom in chrom_lengths:
+        chrom_starts[chrom] = cumulative_length
+        cumulative_length += chrom_lengths[chrom]
+    
+    # Plot each sample
+    for i in range(len(sample_names)):
+        pc1_values = []
+        abs_positions = []
+        chr_positions = []
+        
+        # Collect data for this sample
+        for j, pc1_window in enumerate(results['pc1']):
+            if pc1_window is not None:
+                pc1_values.append(pc1_window[i])
+                # Calculate absolute position
+                chrom = results['chromosomes'][j]
+                rel_pos = results['positions'][j]
+                abs_pos = chrom_starts[chrom] + rel_pos
+                abs_positions.append(abs_pos / 1000000)  # Convert to Mb
+                chr_positions.append(rel_pos / 1000000)  # Convert to Mb
+        
+        # Add traces
+        # Plot with absolute genomic position
+        fig.add_trace(go.Scatter(
+            x=abs_positions,
+            y=pc1_values,
+            mode='lines',
+            name=f'{sample_names[i]} (Genome)',
+            line=dict(color=colors[i], width=1, dash='solid'),
+            showlegend=True
+        ))
+    
+    # Add chromosome boundaries and labels
+    for chrom in chrom_lengths:
+        start_pos = chrom_starts[chrom] / 1000000  # Convert to Mb
+        fig.add_vline(x=start_pos, line_dash="dash", line_color="gray", opacity=0.5)
+        fig.add_annotation(
+            x=start_pos + (chrom_lengths[chrom]/2000000),  # Middle of chromosome
+            y=1.05,
+            text=chrom.split('#')[-1],
+            textangle=45,
+            xref="x",
+            yref="paper",
+            showarrow=False,
+            font=dict(size=10)
+        )
+    
+    # Update layout
+    fig.update_layout(
+        title='Windowed PCA by Genomic Position',
+        xaxis_title='Genomic Position (Mb)',
+        yaxis_title='PC1',
+        showlegend=True,
+        template='plotly_white',
+        height=800,
+        width=1500,
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="right",
+            x=0.99
+        ),
+        margin=dict(t=100)  # Add margin at top for chromosome labels
+    )
+    
+    # Save plot
+    fig.write_html(os.path.join(output_dir, 'windowed_pca_combined.html'))
+    fig.write_image(os.path.join(output_dir, 'windowed_pca_combined.png'))
+
 def windowed_PCA(vcf, window_size=50000, window_step=10000, min_variants=5):
     """Perform windowed PCA analysis"""
     # Load VCF file with specific fields
@@ -163,11 +267,13 @@ if __name__ == "__main__":
             min_variants=5        # Minimum 5 variants per window
         )
         
-        # Create position-based plot
+        # Create plots
         if results and len(results['pc1']) > 0:
-            plot_by_position(results, output_dir)
+            plot_by_position(results, output_dir)  # Original plot
+            plot_combined_positions(results, output_dir)  # New combined plot
             print("\nAnalysis complete! Check output directory for plots:")
             print("1. windowed_pca_by_position.png")
+            print("2. windowed_pca_combined.png")
         else:
             print("\nNo PCA results were generated. Try adjusting parameters.")
             
