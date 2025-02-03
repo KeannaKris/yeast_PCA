@@ -10,7 +10,7 @@ output_dir = "/home/kjohnwill/yeast_PCA"
 os.makedirs(output_dir, exist_ok=True)
 
 # Set file paths - update to your filtered variants file
-vcf = "/home/kjohnwill/yeast_PCA/merged_variants.vcf"
+vcf = "/home/kjohnwill/yeast_PCA/merged_mpileup.vcf"
 
 def process_window_pca(genotypes, scaler='patterson'):
    """Perform PCA on a window of genotypes"""
