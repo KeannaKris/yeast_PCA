@@ -2,7 +2,9 @@
 Data (scerevisiae8.fa): https://github.com/waveygang/wfmash/tree/main/data
 
 The reference and samples (7) can be found in the same file.
+  
   Reference: SDGref
+  
   Samples:
     >DBVPG6044
     >DBVPG6765
