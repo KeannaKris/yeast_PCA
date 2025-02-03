@@ -15,19 +15,11 @@ vcf = "/home/kjohnwill/yeast_PCA/merged_variants.vcf"
 def process_window_pca(genotypes, scaler='patterson'):
     """Perform PCA on a window of genotypes"""
     try:
-        # Print debug info
-        print(f"Input genotype shape: {genotypes.shape}")
-        
         # Convert to alternate allele counts
         ac = genotypes.to_n_alt()
-        print(f"Allele count shape: {ac.shape}")
-        
-        # Print first few values for debugging
-        print(f"First few allele counts: {ac[:5] if ac is not None else 'None'}")
         
         # Skip windows with no variation
         if np.all(ac == ac[0]):
-            print("Skipping window - no variation")
             return None, 0
             
         # Perform PCA
@@ -36,7 +28,7 @@ def process_window_pca(genotypes, scaler='patterson'):
         return (coords[:, 0], # PC1
                 ac.shape[0])  # number of variants
     except Exception as e:
-        print(f"Error in process_window_pca: {str(e)}")
+        print(f"Error in PCA: {str(e)}")
         return None, 0
 
 def plot_by_position(results, output_dir):
@@ -236,12 +228,7 @@ def windowed_PCA(vcf, window_size=50000, window_step=10000, min_variants=5):
         chrom_pos = pos[chrom_mask]
         chrom_genotypes = genotypes[chrom_mask]
         
-        print(f"Chromosome {current_chrom} stats:")
-        print(f"Number of variants: {len(chrom_pos)}")
-        print(f"Genotype shape: {chrom_genotypes.shape}")
-        
         if len(chrom_pos) == 0:
-            print(f"Skipping {current_chrom} - no variants")
             continue
         
         # Process windows
