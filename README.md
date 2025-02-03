@@ -49,7 +49,7 @@ samtools index data/S288C.sorted.bam
 ```
 
 #### Using bcftools to perform variant calling
-created a loop to process eahc chromosome seperately
+created a loop to process each chromosome seperately
 ```{shell}
 for chr in SGDref#1#chrI SGDref#1#chrII SGDref#1#chrIII SGDref#1#chrIV SGDref#1#chrV SGDref#1#chrVI SGDref#1#chrVII SGDref#1#chrVIII SGDref#1#chrIX SGDref#1#chrX SGDref#1#chrXI SGDref#1#chrXII SGDref#1#chrXIII SGDref#1#chrXIV SGDref#1#chrXV SGDref#1#chrXVI SGDref#1#chrMT; do
     echo "Processing $chr"
@@ -67,9 +67,22 @@ Then concatenate/merge
 ```{shell}
 bcftools concat SGDref#1#chr*_mpileup.bcf -Ob -o merged_mpileup.bcf
 ```
-COnvert BCF file into VCF file
+Convert BCF file into VCF file
 ```{shell}
 bcftools view merged_mpileup.bcf -Ov -o merged_mpileup.vcf
 bcftools view merged_mpileup.bcf -Oz -o merged_mpileup.vcf.gz
 ```
 
+## Windowed PCA Analysis
+Had to seperate mitochondrial DNA analysis due to different characteristics compared to the nuclear chromosomes.
+```{shell}
+git clone https://github.com/KeannaKris/yeast_PCA/blob/main/final_winpca.py
+python3 ginal_winpca.py
+```
+The outputs:
+mt_pca_02.html(kb)
+mt_pca_02.png
+windowed_pca_genomic_02.html(shows chr and mb) 
+PCA_windowed_genomic_02.png
+windowed_pca_position_02.html(this one looks horrible, like my original)
+PCA_windowed_position_02.png
