@@ -27,6 +27,7 @@ samtools faidx data/scerevisiae8.fa $(grep ^SGDref -v data/scerevisiae8.fa.fai |
 #check that samples are in file
 grep '^>' data/genome.fa | awk -F'#' '{print $1}' | sort -u
 ```
+---
 #### Using samtools and minimap2 to perform genome alignment
 Perform on each sample
 Extract the sample
@@ -49,7 +50,7 @@ Create index file from sorted BAM
 ```{shell}
 samtools index data/S288C.sorted.bam
 ```
-
+---
 #### Using bcftools to perform variant calling
 created a loop to process each chromosome seperately
 ```{shell}
@@ -74,7 +75,7 @@ Convert BCF file into VCF file
 bcftools view merged_mpileup.bcf -Ov -o merged_mpileup.vcf
 bcftools view merged_mpileup.bcf -Oz -o merged_mpileup.vcf.gz
 ```
-
+---
 ## Windowed PCA Analysis
 Had to seperate mitochondrial DNA analysis due to different characteristics compared to the nuclear chromosomes.
 ```{shell}
@@ -82,9 +83,15 @@ git clone https://github.com/KeannaKris/yeast_PCA/blob/main/final_winpca.py
 python3 ginal_winpca.py
 ```
 The outputs:
+
 mt_pca_02.html(kb)
+
 mt_pca_02.png
+
 windowed_pca_genomic_02.html(shows chr and mb) 
+
 PCA_windowed_genomic_02.png
+
 windowed_pca_position_02.html(this one looks horrible, like my original)
+
 PCA_windowed_position_02.png
