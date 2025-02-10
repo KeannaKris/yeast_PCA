@@ -63,17 +63,19 @@ for chr in SGDref#1#chrI SGDref#1#chrII SGDref#1#chrIII SGDref#1#chrIV SGDref#1#
     data/SK1.sorted.bam \
     data/UWOPS034614.sorted.bam \
     data/Y12.sorted.bam \
-    data/YPS128.sorted.bam > "${chr}_mpileup.bcf"
+    data/YPS128.sorted.bam | bcftools call --ploidy 1 -mv -Ou > "${chr}.bcf"
 done
 ```
 Then concatenate/merge
 ```{shell}
 bcftools concat SGDref#1#chr*_mpileup.bcf -Ob -o merged_mpileup.bcf
+rm SGDref#1#chrVI_mpileup.bcf
+bcftools concat SGDref#1#chr*_mpileup.bcf -Ob -o merged_mpileup.bcf
+
 ```
 Convert BCF file into VCF file
 ```{shell}
 bcftools view merged_mpileup.bcf -Ov -o merged_mpileup.vcf
-bcftools view merged_mpileup.bcf -Oz -o merged_mpileup.vcf.gz
 ```
 ---
 ## Windowed PCA Analysis
