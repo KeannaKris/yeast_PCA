@@ -30,6 +30,7 @@ grep '^>' data/genome.fa | awk -F'#' '{print $1}' | sort -u
 ---
 #### Using samtools and minimap2 to perform genome alignment
 Perform on each sample
+
 Extract the sample
 ```{shell}
 samtools faidx data/genome.fa $(grep -o "^>S288C#1#[^ ]*" data/genome.fa | tr -d '>') > data/S288C.fa
