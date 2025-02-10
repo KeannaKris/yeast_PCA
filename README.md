@@ -83,7 +83,7 @@ bcftools view merged_mpileup.bcf -Ov -o merged_mpileup.vcf
 Had to seperate mitochondrial DNA analysis due to different characteristics compared to the nuclear chromosomes.
 ```{shell}
 git clone https://github.com/KeannaKris/yeast_PCA/blob/main/final_winpca.py
-python3 ginal_winpca.py
+python3 final_winpca.py
 ```
 The outputs:
 
