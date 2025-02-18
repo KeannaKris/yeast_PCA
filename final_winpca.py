@@ -5,12 +5,12 @@ import pandas as pd
 import allel
 import plotly.graph_objects as go
 
-# Set output directory
-output_dir = "/home/kjohnwill/yeast_PCA"
+# Create outputs directory in your current yeast_PCA folder
+output_dir = "outputs"
 os.makedirs(output_dir, exist_ok=True)
 
 # Set file paths - update to your filtered variants file
-vcf = "/home/kjohnwill/yeast_PCA/merged_mpileup.vcf"
+vcf = "merged_mpileup.vcf"
 
 def process_window_pca(genotypes, scaler='patterson'):
    """Perform PCA on a window of genotypes"""
